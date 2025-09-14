@@ -3,50 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <title>MineServer Scout</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 </head>
 <body>
-<div class="container">
-    <h1>MineServer Scout</h1>
+<div class="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-lg mt-8">
+    <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">MineServer Scout</h1>
 
-    <div class="form">
-        <div class="input-group">
-            <label for="host">Host:</label>
-            <input type="text" id="host" value="enx-cirion-14.enx.host">
+    <div class="flex flex-wrap gap-4 justify-center mb-6">
+        <div class="flex flex-col">
+            <label for="host" class="mb-1 font-semibold text-gray-700">Host:</label>
+            <input type="text" id="host" value="enx-cirion-14.enx.host" class="px-3 py-2 rounded-lg border border-gray-300 w-48 focus:outline-none focus:ring-2 focus:ring-blue-400">
         </div>
-        <div class="input-group">
-            <label for="start_port">Porta inicial:</label>
-            <input type="number" id="start_port" value="10000">
+        <div class="flex flex-col">
+            <label for="start_port" class="mb-1 font-semibold text-gray-700">Porta inicial:</label>
+            <input type="number" id="start_port" value="10000" class="px-3 py-2 rounded-lg border border-gray-300 w-32 focus:outline-none focus:ring-2 focus:ring-blue-400">
         </div>
-        <div class="input-group">
-            <label for="end_port">Porta final:</label>
-            <input type="number" id="end_port" value="10100">
+        <div class="flex flex-col">
+            <label for="end_port" class="mb-1 font-semibold text-gray-700">Porta final:</label>
+            <input type="number" id="end_port" value="10100" class="px-3 py-2 rounded-lg border border-gray-300 w-32 focus:outline-none focus:ring-2 focus:ring-blue-400">
         </div>
-        <button class="scan-btn" onclick="startScan()">Scan</button>
+        <button class="bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg px-6 py-2 mt-6 transition-colors duration-200 shadow scan-btn" onclick="startScan()">Scan</button>
     </div>
 
-    <div id="status" class="status"></div>
+    <div id="status" class="font-semibold text-center mb-4 status flex flex-col items-center justify-center"></div>
 
-    <table id="results" class="display">
-        <thead>
-            <tr>
-                <th>Ícone</th>
-                <th>Porta</th>
-                <th>Versão</th>
-                <th>MOTD</th>
-                <th>Players</th>
-                <th>Servidor</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
+    <div class="overflow-x-auto rounded-lg">
+        <table id="results" class="display w-full text-sm text-left">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="p-2">Ícone</th>
+                    <th class="p-2">Porta</th>
+                    <th class="p-2">Versão</th>
+                    <th class="p-2">MOTD</th>
+                    <th class="p-2">Players</th>
+                    <th class="p-2">Servidor</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script>
-let table = $('#results').DataTable();
+let table = $('#results').DataTable({
+    columnDefs: [
+        {
+            targets: 0, // Favicon column
+            orderable: false,
+            searchable: false,
+            render: function(data, type, row, meta) {
+                // Always render as HTML
+                return data;
+            }
+        }
+    ],
+    // Prevent DataTables from escaping HTML in all columns
+    createdRow: function(row, data, dataIndex) {
+        // No-op, but can be used for further customization
+    }
+});
 
 function startScan(){
     table.clear().draw();
@@ -54,7 +74,15 @@ function startScan(){
     let start_port = $("#start_port").val();
     let end_port = $("#end_port").val();
 
-    $("#status").text("🔄 Escaneando portas...").css("color", "blue");
+    $("#status").html(`
+        <span class="flex items-center justify-center gap-2 text-blue-600">
+            <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            Escaneando portas...
+        </span>
+    `).css("color", "");
 
     fetch("/scan", {
         method: "POST",
@@ -64,18 +92,18 @@ function startScan(){
     .then(res => res.json())
     .then(data => {
         if(data.length === 0){
-            $("#status").text("❌ Nenhum servidor encontrado neste range.").css("color", "red");
+            $("#status").html(`<span class='text-red-600'>❌ Nenhum servidor encontrado neste range.</span>`);
         } else {
-            $("#status").text(`✅ Scan concluído! ${data.length} servidor(es) encontrado(s).`).css("color", "green");
+            $("#status").html(`<span class='text-green-600'>✅ Scan concluído! ${data.length} servidor(es) encontrado(s).</span>`);
         }
 
         data.forEach(s => {
-            const ipButton = `<input type="text" value="${host}:${s.port}" id="ip_${s.port}" readonly style="width:120px;">
-                              <button class="copy-btn" onclick="copyToClipboard('ip_${s.port}')">Copiar</button>`;
+
+            const ipButton = `<input type="text" value="${host}:${s.port}" id="ip_${s.port}" readonly class="px-2 py-1 rounded border border-gray-300 w-28 text-xs mr-2">\n                              <button class="bg-blue-600 hover:bg-blue-700 text-white rounded px-2 py-1 text-xs copy-btn" onclick="copyToClipboard('ip_${s.port}')">Copiar</button>`;
 
             const favicon = s.favicon 
-                ? `<img src="${s.favicon}" class="favicon">` 
-                : `<div class="favicon-placeholder"></div>`;
+                ? `<img src="${s.favicon}" class="w-8 h-8 rounded favicon">` 
+                : `<div class="w-8 h-8 bg-gray-300 rounded favicon-placeholder"></div>`;
 
             table.row.add([
                 favicon,
@@ -89,7 +117,7 @@ function startScan(){
     })
     .catch(err => {
         console.error(err);
-        $("#status").text("❌ Ocorreu um erro durante o scan.").css("color", "red");
+    $("#status").html(`<span class='text-red-600'>❌ Ocorreu um erro durante o scan.</span>`);
     });
 }
 

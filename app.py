@@ -88,3 +88,6 @@ def scan():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+# For Vercel WSGI
+application = app
