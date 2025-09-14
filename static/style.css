@@ -1,0 +1,40 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #f2f2f2;
+    padding: 20px;
+}
+.container {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 900px;
+    margin: auto;
+}
+h1 {
+    text-align: center;
+}
+.form {
+    margin-bottom: 10px;
+}
+.input-group {
+    margin: 10px 0;
+}
+label {
+    display: inline-block;
+    width: 100px;
+}
+input[type="text"], input[type="number"] {
+    padding: 5px 10px;
+    width: 200px;
+}
+button {
+    padding: 5px 15px;
+    cursor: pointer;
+}
+table.dataTable {
+    width: 100% !important;
+}
+.status {
+    margin: 10px 0;
+    font-weight: bold;
+}
