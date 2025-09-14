@@ -2,13 +2,13 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft Server Scanner</title>
+    <title>MineServer Scout</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 </head>
 <body>
 <div class="container">
-    <h1>Minecraft Server Scanner</h1>
+    <h1>MineServer Scout</h1>
 
     <div class="form">
         <div class="input-group">
@@ -23,7 +23,7 @@
             <label for="end_port">Porta final:</label>
             <input type="number" id="end_port" value="10100">
         </div>
-        <button onclick="startScan()">Scan</button>
+        <button class="scan-btn" onclick="startScan()">Scan</button>
     </div>
 
     <div id="status" class="status"></div>
@@ -31,6 +31,7 @@
     <table id="results" class="display">
         <thead>
             <tr>
+                <th>Ícone</th>
                 <th>Porta</th>
                 <th>Versão</th>
                 <th>MOTD</th>
@@ -53,7 +54,6 @@ function startScan(){
     let start_port = $("#start_port").val();
     let end_port = $("#end_port").val();
 
-    // Feedback inicial
     $("#status").text("🔄 Escaneando portas...").css("color", "blue");
 
     fetch("/scan", {
@@ -71,8 +71,14 @@ function startScan(){
 
         data.forEach(s => {
             const ipButton = `<input type="text" value="${host}:${s.port}" id="ip_${s.port}" readonly style="width:120px;">
-                              <button onclick="copyToClipboard('ip_${s.port}')">Copiar</button>`;
+                              <button class="copy-btn" onclick="copyToClipboard('ip_${s.port}')">Copiar</button>`;
+
+            const favicon = s.favicon 
+                ? `<img src="${s.favicon}" class="favicon">` 
+                : `<div class="favicon-placeholder"></div>`;
+
             table.row.add([
+                favicon,
                 s.port,
                 s.version,
                 s.motd,
@@ -90,7 +96,7 @@ function startScan(){
 function copyToClipboard(elementId) {
     const copyText = document.getElementById(elementId);
     copyText.select();
-    copyText.setSelectionRange(0, 99999); // Para mobile
+    copyText.setSelectionRange(0, 99999);
     document.execCommand("copy");
     alert(`Copiado: ${copyText.value}`);
 }
