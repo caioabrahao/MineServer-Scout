@@ -75,13 +75,30 @@ def test_port(host, port, timeout=1):
 
 # ---- Main ----
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print("Uso: python scan_ports.py <host> <porta_inicial> <porta_final>")
-        sys.exit(1)
+    import argparse
+    parser = argparse.ArgumentParser(description="Varredor de portas Minecraft")
+    parser.add_argument("host", nargs="?", help="Host do servidor")
+    parser.add_argument("start_port", nargs="?", type=int, help="Porta inicial")
+    parser.add_argument("end_port", nargs="?", type=int, help="Porta final")
+    parser.add_argument("--defaults", action="store_true", help="Usar host e portas padrão (enx-cirion-18.enx.host 10000 10100)")
+    args = parser.parse_args()
 
-    host = sys.argv[1]
-    start_port = int(sys.argv[2])
-    end_port = int(sys.argv[3])
+    # Defaults
+    default_host = "enx-cirion-18.enx.host"
+    default_start = 10000
+    default_end = 10100
+
+    if args.defaults:
+        host = args.host if args.host else default_host
+        start_port = args.start_port if args.start_port else default_start
+        end_port = args.end_port if args.end_port else default_end
+    else:
+        if not (args.host and args.start_port and args.end_port):
+            print("Uso: python scan_ports.py <host> <porta_inicial> <porta_final> [--defaults]")
+            sys.exit(1)
+        host = args.host
+        start_port = args.start_port
+        end_port = args.end_port
 
     results = []
 
