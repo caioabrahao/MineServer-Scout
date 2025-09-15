@@ -10,6 +10,7 @@ let table = $('#results').DataTable({
             }
         }
     ],
+    // Prevent DataTables from escaping HTML in all columns
     createdRow: function(row, data, dataIndex) {
         // No-op, but can be used for further customization
     }
@@ -20,13 +21,26 @@ let totalPorts = 0;
 let foundServers = 0;
 
 function startScan(){
+    // Clear previous results and reset counters
     table.clear().draw();
     foundServers = 0;
+
+    // Show the results table
+    $("#results_wrapper").show();
+
     let host = $("#host").val();
     let start_port = $("#start_port").val();
     let end_port = $("#end_port").val();
+
+    // Disable scan button
     $("#scan_btn").prop("disabled", true).text("Escaneando...");
-    if (eventSource) { eventSource.close(); }
+
+    // Close any existing event source
+    if (eventSource) {
+        eventSource.close();
+    }
+
+    // Show initial status
     $("#status").html(`
         <span class="flex items-center justify-center gap-2 text-blue-600">
             <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -36,38 +50,56 @@ function startScan(){
             Iniciando varredura...
         </span>
     `).css("color", "");
+
+    // Show progress bar
     $("#progress_container").show();
     $("#progress_bar").css("width", "0%");
     $("#progress_text").text("0%");
+
+    // Start real-time scan using fetch with streaming
     startRealtimeScan(host, start_port, end_port);
 }
 
 function startRealtimeScan(host, start_port, end_port) {
     fetch('/scan_realtime', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+        },
         body: JSON.stringify({host, start_port, end_port})
     })
     .then(response => {
-        if (!response.ok) throw new Error('Network response was not ok');
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
+        
         function readStream() {
             return reader.read().then(({ done, value }) => {
-                if (done) return;
+                if (done) {
+                    return;
+                }
+                
                 const chunk = decoder.decode(value, { stream: true });
                 const lines = chunk.split('\n');
+                
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
                         try {
                             const data = JSON.parse(line.substring(6));
                             handleRealtimeEvent(data, host);
-                        } catch (e) { console.error('Error parsing SSE data:', e); }
+                        } catch (e) {
+                            console.error('Error parsing SSE data:', e);
+                        }
                     }
                 }
+                
                 return readStream();
             });
         }
+        
         return readStream();
     })
     .catch(error => {
@@ -92,15 +124,18 @@ function handleRealtimeEvent(data, host) {
             `);
             totalPorts = data.total_ports;
             break;
+            
         case 'result':
             foundServers++;
             addServerToTable(data.data, host);
             break;
+            
         case 'progress':
             const percentage = Math.round((data.completed / data.total) * 100);
             $("#progress_bar").css("width", percentage + "%");
             $("#progress_text").text(`${data.completed}/${data.total} portas (${percentage}%)`);
             break;
+            
         case 'complete':
             $("#progress_container").hide();
             $("#scan_btn").prop("disabled", false).text("Scan");
@@ -114,8 +149,11 @@ function handleRealtimeEvent(data, host) {
 }
 
 function addServerToTable(server, host) {
-    const ipButton = `<input type="text" value="${host}:${server.port}" id="ip_${server.port}" readonly class="px-2 py-1 rounded border border-gray-300 w-28 text-xs mr-2">\n                      <button class="bg-blue-600 hover:bg-blue-700 text-white rounded px-2 py-1 text-xs copy-btn" onclick="copyToClipboard('ip_${server.port}')">Copiar</button>`;
+    const ipButton = `<input type="text" value="${host}:${server.port}" id="ip_${server.port}" readonly class="px-2 py-1 rounded border border-gray-300 w-28 text-xs mr-2">
+                      <button class="bg-blue-600 hover:bg-blue-700 text-white rounded px-2 py-1 text-xs copy-btn" onclick="copyToClipboard('ip_${server.port}')">Copiar</button>`;
+
     const favicon = createFaviconElement(server.favicon);
+
     table.row.add([
         favicon,
         server.port,
@@ -130,10 +168,14 @@ function createFaviconElement(faviconData) {
     if (!faviconData) {
         return `<div class="w-8 h-8 bg-gray-300 rounded favicon-placeholder">?</div>`;
     }
+    
+    // Clean the favicon data (remove data:image/png;base64, prefix if present)
     let cleanFaviconData = faviconData;
     if (faviconData.startsWith('data:image/png;base64,')) {
         cleanFaviconData = faviconData.replace('data:image/png;base64,', '');
     }
+    
+    // Create a container for the favicon with fallback
     return `<div class="relative">
         <img src="data:image/png;base64,${cleanFaviconData}" 
              class="w-8 h-8 rounded favicon" 
@@ -147,6 +189,7 @@ function createFaviconElement(faviconData) {
 }
 
 function handleFaviconError(img) {
+    // Hide the image and show the placeholder with error state
     img.style.display = 'none';
     const placeholder = img.nextElementSibling;
     if (placeholder) {
@@ -156,6 +199,7 @@ function handleFaviconError(img) {
 }
 
 function handleFaviconLoad(img) {
+    // Ensure the image is visible when loaded successfully
     img.style.display = 'block';
     const placeholder = img.nextElementSibling;
     if (placeholder) {
@@ -168,5 +212,14 @@ function copyToClipboard(elementId) {
     copyText.select();
     copyText.setSelectionRange(0, 99999);
     document.execCommand("copy");
-    alert(`Copiado: ${copyText.value}`);
+
+    // Show subtle notification
+    const notif = document.getElementById('copied-notification');
+    notif.style.opacity = '1';
+    notif.style.pointerEvents = 'auto';
+    clearTimeout(window._copiedTimeout);
+    window._copiedTimeout = setTimeout(() => {
+        notif.style.opacity = '0';
+        notif.style.pointerEvents = 'none';
+    }, 1200);
 }
