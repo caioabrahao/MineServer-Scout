@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <link rel="icon" type="image/png" href="/static/favicon2.png">
 </head>
 <body>
 <div class="max-w-4xl mx-auto bg-white p-2 sm:p-8 rounded-xl shadow-lg mt-2 sm:mt-8">
@@ -14,17 +15,26 @@
 
     <form class="flex flex-col sm:flex-row flex-wrap gap-4 justify-center mb-4 sm:mb-6" onsubmit="startScan(); return false;">
         <div class="flex flex-col w-full sm:w-auto">
-            <label for="host" class="mb-2 font-semibold text-gray-700 text-lg sm:text-base">Host:</label>
+            <label for="host" class="mb-2 font-semibold text-gray-700 text-lg sm:text-base flex items-center gap-1">
+                Host:
+                <span class="ml-1 bg-gray-200 rounded-full px-2 py-1 cursor-pointer text-blue-500 hover:text-blue-700" title="Digite o endereço do servidor (ex: enx-cirion-18.enx.host ou um IP)">?</span>
+            </label>
             <input type="text" id="host" value="enx-cirion-18.enx.host" autocomplete="off"
                 class="px-4 py-4 sm:py-2 rounded-xl border border-gray-300 w-full sm:w-56 text-lg sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200">
         </div>
         <div class="flex flex-col w-full sm:w-auto">
-            <label for="start_port" class="mb-2 font-semibold text-gray-700 text-lg sm:text-base">Porta inicial:</label>
+            <label for="start_port" class="mb-2 font-semibold text-gray-700 text-lg sm:text-base flex items-center gap-1">
+                Porta inicial:
+                <span class="ml-1 bg-gray-200 rounded-full px-2 py-1 cursor-pointer text-blue-500 hover:text-blue-700" title="Digite o número da porta inicial para o scan (ex: 10000)">?</span>
+            </label>
             <input type="number" id="start_port" value="10000" autocomplete="off"
                 class="px-4 py-4 sm:py-2 rounded-xl border border-gray-300 w-full sm:w-40 text-lg sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200">
         </div>
         <div class="flex flex-col w-full sm:w-auto">
-            <label for="end_port" class="mb-2 font-semibold text-gray-700 text-lg sm:text-base">Porta final:</label>
+            <label for="end_port" class="mb-2 font-semibold text-gray-700 text-lg sm:text-base flex items-center gap-1">
+                Porta final:
+                <span class="ml-1 bg-gray-200 rounded-full px-2 py-1 cursor-pointer text-blue-500 hover:text-blue-700" title="Digite o número da porta final para o scan (ex: 10100)">?</span>
+            </label>
             <input type="number" id="end_port" value="10100" autocomplete="off"
                 class="px-4 py-4 sm:py-2 rounded-xl border border-gray-300 w-full sm:w-40 text-lg sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200">
         </div>
@@ -41,7 +51,7 @@
         <div id="progress_text" class="text-sm text-gray-600 mt-1 text-center">0%</div>
     </div>
 
-    <div class="overflow-x-auto rounded-lg">
+    <div id="results_wrapper" class="overflow-x-auto rounded-lg" style="display: none;">
         <table id="results" class="display min-w-[700px] w-full text-base sm:text-sm text-left">
             <thead class="bg-gray-100">
                 <tr>
@@ -56,13 +66,17 @@
             <tbody></tbody>
         </table>
     </div>
+
+<!-- Copied notification -->
+<div id="copied-notification" class="fixed left-1/2 top-6 z-50 px-4 py-2 rounded bg-green-600 text-white text-sm shadow-lg opacity-0 pointer-events-none transition-opacity duration-300" style="transform: translateX(-50%);">
+    Copiado para a área de transferência!
+</div>
 </div>
 
 <!-- Footer credit -->
-<footer class="max-w-4xl mx-auto mt-4 sm:mt-6 text-center text-gray-500 text-sm">
-    <span>made by </span>
-    <a href="https://github.com/caioabrahao" target="_blank" rel="noopener noreferrer" class="underline hover:text-gray-700">Caio Abrahão</a>
-    
+<footer class="max-w-4xl mx-auto mt-4 sm:mt-6 text-center text-gray-500 text-sm h-16 flex justify-center items-center">
+    <p><span>made by </span>
+    <a href="https://github.com/caioabrahao" target="_blank" rel="noopener noreferrer" class="underline hover:text-gray-700">Caio Abrahão</a></p>
 </footer>
 
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -94,14 +108,17 @@ function startScan(){
     // Clear previous results and reset counters
     table.clear().draw();
     foundServers = 0;
-    
+
+    // Show the results table
+    $("#results_wrapper").show();
+
     let host = $("#host").val();
     let start_port = $("#start_port").val();
     let end_port = $("#end_port").val();
-    
+
     // Disable scan button
     $("#scan_btn").prop("disabled", true).text("Escaneando...");
-    
+
     // Close any existing event source
     if (eventSource) {
         eventSource.close();
@@ -117,7 +134,7 @@ function startScan(){
             Iniciando varredura...
         </span>
     `).css("color", "");
-    
+
     // Show progress bar
     $("#progress_container").show();
     $("#progress_bar").css("width", "0%");
@@ -279,7 +296,16 @@ function copyToClipboard(elementId) {
     copyText.select();
     copyText.setSelectionRange(0, 99999);
     document.execCommand("copy");
-    alert(`Copiado: ${copyText.value}`);
+
+    // Show subtle notification
+    const notif = document.getElementById('copied-notification');
+    notif.style.opacity = '1';
+    notif.style.pointerEvents = 'auto';
+    clearTimeout(window._copiedTimeout);
+    window._copiedTimeout = setTimeout(() => {
+        notif.style.opacity = '0';
+        notif.style.pointerEvents = 'none';
+    }, 1200);
 }
 </script>
 </body>
