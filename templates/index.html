@@ -9,37 +9,48 @@
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 </head>
 <body>
-<div class="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-lg mt-8">
-    <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">MineServer Scout</h1>
+<div class="max-w-4xl mx-auto bg-white p-2 sm:p-8 rounded-xl shadow-lg mt-2 sm:mt-8">
+    <h1 class="text-2xl sm:text-3xl font-bold text-center mb-4 sm:mb-8 text-gray-800">MineServer Scout</h1>
 
-    <div class="flex flex-wrap gap-4 justify-center mb-6">
-        <div class="flex flex-col">
-            <label for="host" class="mb-1 font-semibold text-gray-700">Host:</label>
-            <input type="text" id="host" value="enx-cirion-14.enx.host" class="px-3 py-2 rounded-lg border border-gray-300 w-48 focus:outline-none focus:ring-2 focus:ring-blue-400">
+    <form class="flex flex-col sm:flex-row flex-wrap gap-4 justify-center mb-4 sm:mb-6" onsubmit="startScan(); return false;">
+        <div class="flex flex-col w-full sm:w-auto">
+            <label for="host" class="mb-2 font-semibold text-gray-700 text-lg sm:text-base">Host:</label>
+            <input type="text" id="host" value="enx-cirion-14.enx.host" autocomplete="off"
+                class="px-4 py-4 sm:py-2 rounded-xl border border-gray-300 w-full sm:w-56 text-lg sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200">
         </div>
-        <div class="flex flex-col">
-            <label for="start_port" class="mb-1 font-semibold text-gray-700">Porta inicial:</label>
-            <input type="number" id="start_port" value="10000" class="px-3 py-2 rounded-lg border border-gray-300 w-32 focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <div class="flex flex-col w-full sm:w-auto">
+            <label for="start_port" class="mb-2 font-semibold text-gray-700 text-lg sm:text-base">Porta inicial:</label>
+            <input type="number" id="start_port" value="10000" autocomplete="off"
+                class="px-4 py-4 sm:py-2 rounded-xl border border-gray-300 w-full sm:w-40 text-lg sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200">
         </div>
-        <div class="flex flex-col">
-            <label for="end_port" class="mb-1 font-semibold text-gray-700">Porta final:</label>
-            <input type="number" id="end_port" value="10100" class="px-3 py-2 rounded-lg border border-gray-300 w-32 focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <div class="flex flex-col w-full sm:w-auto">
+            <label for="end_port" class="mb-2 font-semibold text-gray-700 text-lg sm:text-base">Porta final:</label>
+            <input type="number" id="end_port" value="10100" autocomplete="off"
+                class="px-4 py-4 sm:py-2 rounded-xl border border-gray-300 w-full sm:w-40 text-lg sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200">
         </div>
-        <button class="bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg px-6 py-2 mt-6 transition-colors duration-200 shadow scan-btn" onclick="startScan()">Scan</button>
-    </div>
+        <button type="submit" id="scan_btn" class="bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl px-8 py-4 sm:py-2 mt-2 sm:mt-6 transition-colors duration-200 shadow scan-btn w-full sm:w-auto text-lg sm:text-base">Scan</button>
+    </form>
 
     <div id="status" class="font-semibold text-center mb-4 status flex flex-col items-center justify-center"></div>
+    
+    <!-- Progress bar -->
+    <div id="progress_container" class="mb-4" style="display: none;">
+        <div class="bg-gray-200 rounded-full h-2.5">
+            <div id="progress_bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <div id="progress_text" class="text-sm text-gray-600 mt-1 text-center">0%</div>
+    </div>
 
     <div class="overflow-x-auto rounded-lg">
-        <table id="results" class="display w-full text-sm text-left">
+        <table id="results" class="display min-w-[700px] w-full text-base sm:text-sm text-left">
             <thead class="bg-gray-100">
                 <tr>
-                    <th class="p-2">Ícone</th>
-                    <th class="p-2">Porta</th>
-                    <th class="p-2">Versão</th>
-                    <th class="p-2">MOTD</th>
-                    <th class="p-2">Players</th>
-                    <th class="p-2">Servidor</th>
+                    <th class="p-3 sm:p-2">Ícone</th>
+                    <th class="p-3 sm:p-2">Porta</th>
+                    <th class="p-3 sm:p-2">Versão</th>
+                    <th class="p-3 sm:p-2">MOTD</th>
+                    <th class="p-3 sm:p-2">Players</th>
+                    <th class="p-3 sm:p-2">Servidor</th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -68,57 +79,192 @@ let table = $('#results').DataTable({
     }
 });
 
+let eventSource = null;
+let totalPorts = 0;
+let foundServers = 0;
+
 function startScan(){
+    // Clear previous results and reset counters
     table.clear().draw();
+    foundServers = 0;
+    
     let host = $("#host").val();
     let start_port = $("#start_port").val();
     let end_port = $("#end_port").val();
+    
+    // Disable scan button
+    $("#scan_btn").prop("disabled", true).text("Escaneando...");
+    
+    // Close any existing event source
+    if (eventSource) {
+        eventSource.close();
+    }
 
+    // Show initial status
     $("#status").html(`
         <span class="flex items-center justify-center gap-2 text-blue-600">
             <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
             </svg>
-            Escaneando portas...
+            Iniciando varredura...
         </span>
     `).css("color", "");
+    
+    // Show progress bar
+    $("#progress_container").show();
+    $("#progress_bar").css("width", "0%");
+    $("#progress_text").text("0%");
 
-    fetch("/scan", {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
+    // Start real-time scan using fetch with streaming
+    startRealtimeScan(host, start_port, end_port);
+}
+
+function startRealtimeScan(host, start_port, end_port) {
+    fetch('/scan_realtime', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
         body: JSON.stringify({host, start_port, end_port})
     })
-    .then(res => res.json())
-    .then(data => {
-        if(data.length === 0){
-            $("#status").html(`<span class='text-red-600'>❌ Nenhum servidor encontrado neste range.</span>`);
-        } else {
-            $("#status").html(`<span class='text-green-600'>✅ Scan concluído! ${data.length} servidor(es) encontrado(s).</span>`);
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
         }
-
-        data.forEach(s => {
-
-            const ipButton = `<input type="text" value="${host}:${s.port}" id="ip_${s.port}" readonly class="px-2 py-1 rounded border border-gray-300 w-28 text-xs mr-2">\n                              <button class="bg-blue-600 hover:bg-blue-700 text-white rounded px-2 py-1 text-xs copy-btn" onclick="copyToClipboard('ip_${s.port}')">Copiar</button>`;
-
-            const favicon = s.favicon 
-                ? `<img src="${s.favicon}" class="w-8 h-8 rounded favicon">` 
-                : `<div class="w-8 h-8 bg-gray-300 rounded favicon-placeholder"></div>`;
-
-            table.row.add([
-                favicon,
-                s.port,
-                s.version,
-                s.motd,
-                s.players,
-                ipButton
-            ]).draw(false);
-        });
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        function readStream() {
+            return reader.read().then(({ done, value }) => {
+                if (done) {
+                    return;
+                }
+                
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.substring(6));
+                            handleRealtimeEvent(data, host);
+                        } catch (e) {
+                            console.error('Error parsing SSE data:', e);
+                        }
+                    }
+                }
+                
+                return readStream();
+            });
+        }
+        
+        return readStream();
     })
-    .catch(err => {
-        console.error(err);
-    $("#status").html(`<span class='text-red-600'>❌ Ocorreu um erro durante o scan.</span>`);
+    .catch(error => {
+        console.error('Error during real-time scan:', error);
+        $("#status").html(`<span class='text-red-600'>❌ Ocorreu um erro durante o scan.</span>`);
+        $("#progress_container").hide();
+        $("#scan_btn").prop("disabled", false).text("Scan");
     });
+}
+
+function handleRealtimeEvent(data, host) {
+    switch(data.type) {
+        case 'status':
+            $("#status").html(`
+                <span class="flex items-center justify-center gap-2 text-blue-600">
+                    <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                    ${data.message}
+                </span>
+            `);
+            totalPorts = data.total_ports;
+            break;
+            
+        case 'result':
+            foundServers++;
+            addServerToTable(data.data, host);
+            break;
+            
+        case 'progress':
+            const percentage = Math.round((data.completed / data.total) * 100);
+            $("#progress_bar").css("width", percentage + "%");
+            $("#progress_text").text(`${data.completed}/${data.total} portas (${percentage}%)`);
+            break;
+            
+        case 'complete':
+            $("#progress_container").hide();
+            $("#scan_btn").prop("disabled", false).text("Scan");
+            if (foundServers === 0) {
+                $("#status").html(`<span class='text-red-600'>❌ Nenhum servidor encontrado neste range.</span>`);
+            } else {
+                $("#status").html(`<span class='text-green-600'>✅ Scan concluído! ${foundServers} servidor(es) encontrado(s).</span>`);
+            }
+            break;
+    }
+}
+
+function addServerToTable(server, host) {
+    const ipButton = `<input type="text" value="${host}:${server.port}" id="ip_${server.port}" readonly class="px-2 py-1 rounded border border-gray-300 w-28 text-xs mr-2">
+                      <button class="bg-blue-600 hover:bg-blue-700 text-white rounded px-2 py-1 text-xs copy-btn" onclick="copyToClipboard('ip_${server.port}')">Copiar</button>`;
+
+    const favicon = createFaviconElement(server.favicon);
+
+    table.row.add([
+        favicon,
+        server.port,
+        server.version,
+        server.motd,
+        server.players,
+        ipButton
+    ]).draw(false);
+}
+
+function createFaviconElement(faviconData) {
+    if (!faviconData) {
+        return `<div class="w-8 h-8 bg-gray-300 rounded favicon-placeholder">?</div>`;
+    }
+    
+    // Clean the favicon data (remove data:image/png;base64, prefix if present)
+    let cleanFaviconData = faviconData;
+    if (faviconData.startsWith('data:image/png;base64,')) {
+        cleanFaviconData = faviconData.replace('data:image/png;base64,', '');
+    }
+    
+    // Create a container for the favicon with fallback
+    return `<div class="relative">
+        <img src="data:image/png;base64,${cleanFaviconData}" 
+             class="w-8 h-8 rounded favicon" 
+             alt="Server Icon" 
+             onerror="handleFaviconError(this)"
+             onload="handleFaviconLoad(this)"
+             style="display: none;">
+        <div class="w-8 h-8 bg-gray-300 rounded favicon-placeholder" 
+             style="position: absolute; top: 0; left: 0;">⏳</div>
+    </div>`;
+}
+
+function handleFaviconError(img) {
+    // Hide the image and show the placeholder with error state
+    img.style.display = 'none';
+    const placeholder = img.nextElementSibling;
+    if (placeholder) {
+        placeholder.textContent = '?';
+        placeholder.style.display = 'flex';
+    }
+}
+
+function handleFaviconLoad(img) {
+    // Ensure the image is visible when loaded successfully
+    img.style.display = 'block';
+    const placeholder = img.nextElementSibling;
+    if (placeholder) {
+        placeholder.style.display = 'none';
+    }
 }
 
 function copyToClipboard(elementId) {

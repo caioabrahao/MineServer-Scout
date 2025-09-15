@@ -1,6 +1,8 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 import socket, struct, json
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
+import time
 
 app = Flask(__name__)
 
@@ -62,7 +64,13 @@ def test_port(host, port):
         mods = []
         if "modinfo" in status:
             mods = [m["modid"] + "@" + m["version"] for m in status["modinfo"].get("modList", [])]
-        return {"port": port, "version": version, "motd": motd, "players": players, "mods": mods}
+        
+        # Extract favicon if available
+        favicon = None
+        if "favicon" in status and status["favicon"]:
+            favicon = status["favicon"]
+        
+        return {"port": port, "version": version, "motd": motd, "players": players, "mods": mods, "favicon": favicon}
     return None
 
 # ---- Rotas Flask ----
@@ -78,13 +86,53 @@ def scan():
     end_port = int(data.get("end_port"))
 
     results = []
-    with ThreadPoolExecutor(max_workers=50) as executor:
+    # Get max workers from environment or use default
+    MAX_WORKERS = int(os.getenv('MAX_WORKERS', '50'))
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = [executor.submit(test_port, host, port) for port in range(start_port, end_port + 1)]
         for f in as_completed(futures):
             result = f.result()
             if result:
                 results.append(result)
     return jsonify(results)
+
+@app.route("/scan_realtime", methods=["POST"])
+def scan_realtime():
+    data = request.get_json()
+    host = data.get("host")
+    start_port = int(data.get("start_port"))
+    end_port = int(data.get("end_port"))
+    
+    def generate():
+        # Send initial status
+        yield f"data: {json.dumps({'type': 'status', 'message': 'Iniciando varredura...', 'total_ports': end_port - start_port + 1})}\n\n"
+        
+        results = []
+        MAX_WORKERS = int(os.getenv('MAX_WORKERS', '50'))
+        
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = [executor.submit(test_port, host, port) for port in range(start_port, end_port + 1)]
+            
+            for f in as_completed(futures):
+                result = f.result()
+                if result:
+                    results.append(result)
+                    # Send result immediately
+                    yield f"data: {json.dumps({'type': 'result', 'data': result})}\n\n"
+                
+                # Send progress update
+                progress = len([f for f in futures if f.done()])
+                yield f"data: {json.dumps({'type': 'progress', 'completed': progress, 'total': len(futures)})}\n\n"
+        
+        # Send completion status
+        yield f"data: {json.dumps({'type': 'complete', 'total_found': len(results)})}\n\n"
+    
+    return Response(generate(), mimetype='text/event-stream', headers={
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+    })
 
 if __name__ == "__main__":
     app.run(debug=True)
